@@ -3,6 +3,8 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
+    thread,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -95,6 +97,7 @@ pub fn start() -> Result<()> {
         let plist = path_arg(&launch_agent_path);
         run_launchctl(&["bootstrap", &domain, &plist])
             .context("Failed to bootstrap LaunchAgent")?;
+        wait_for_label_loaded(paths::SERVICE_LABEL, Duration::from_secs(5))?;
     }
 
     let target = format!("{}/{}", launchctl_domain(), paths::SERVICE_LABEL);
@@ -242,6 +245,21 @@ fn is_label_loaded(label: &str) -> Result<bool> {
         .output()
         .context("Failed to run launchctl print")?;
     Ok(output.status.success())
+}
+
+fn wait_for_label_loaded(label: &str, timeout: Duration) -> Result<()> {
+    let started_at = Instant::now();
+    loop {
+        if is_label_loaded(label)? {
+            return Ok(());
+        }
+
+        if started_at.elapsed() >= timeout {
+            bail!("Timed out waiting for LaunchAgent `{label}` to load");
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
 }
 
 fn stop_legacy_if_loaded() -> Result<()> {
