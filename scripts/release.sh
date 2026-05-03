@@ -343,7 +343,10 @@ fi
 
 if [[ "$PUBLISH" -eq 1 ]]; then
   echo "==> Publishing GitHub Release $VERSION"
-  mapfile -t release_assets < <(find "$OUT_DIR" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'latch-release-manifest.json' \) | sort)
+  release_assets=()
+  while IFS= read -r asset; do
+    release_assets+=("$asset")
+  done < <(find "$OUT_DIR" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'latch-release-manifest.json' \) | sort)
   if gh release view "$VERSION" >/dev/null 2>&1; then
     gh release upload "$VERSION" "${release_assets[@]}" --clobber
   else
