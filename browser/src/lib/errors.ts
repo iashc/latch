@@ -18,20 +18,20 @@ export function getErrorMessage(error: unknown) {
   }
 
   if (error instanceof TypeError) {
-    return "无法连接 Latch 服务";
+    return "Unable to connect to the Latch service";
   }
 
   if (error instanceof Error) {
     return error.message;
   }
 
-  return "发生未知错误";
+  return "Unknown error";
 }
 
 export function toApiError(response: Response, parsed: unknown) {
   const payload = parsed as ErrorPayload | null;
   return new LatchApiError(
-    payload?.error.message || `请求失败：${response.status}`,
+    payload?.error.message || `Request failed: ${response.status}`,
     payload?.error.code,
     response.status,
     payload?.error.details

@@ -38,7 +38,7 @@ const api = computed<LatchApi>(() => createLatchApi(settings.value.serverUrl));
 const initialTitle = computed(() => currentBookmark.value?.title || currentTab.value?.title || "");
 const initialDescription = computed(() => currentBookmark.value?.description || "");
 const initialTags = computed(() => currentBookmark.value?.tags || []);
-const submitLabel = computed(() => (currentBookmark.value ? "更新书签" : "保存书签"));
+const submitLabel = computed(() => (currentBookmark.value ? "Update Bookmark" : "Save Bookmark"));
 const currentUrl = computed(() => currentTab.value?.url || "");
 
 async function bootstrap() {
@@ -79,7 +79,7 @@ async function refreshCurrentBookmark() {
 
 async function handleSubmit(value: BookmarkFormValue) {
   if (!canSaveCurrentTab.value) {
-    message.value = "当前页面不能保存";
+    message.value = "This page cannot be saved";
     return;
   }
 
@@ -92,7 +92,7 @@ async function handleSubmit(value: BookmarkFormValue) {
           url: currentUrl.value,
           ...value
         });
-    message.value = currentBookmark.value ? "已保存" : "";
+    message.value = currentBookmark.value ? "Saved" : "";
     await searchBookmarks();
   } catch (error) {
     message.value = getErrorMessage(error);
@@ -102,7 +102,7 @@ async function handleSubmit(value: BookmarkFormValue) {
 }
 
 async function deleteBookmark(bookmark: Bookmark) {
-  const confirmed = window.confirm(`删除「${bookmark.title || bookmark.url}」？`);
+  const confirmed = window.confirm(`Delete "${bookmark.title || bookmark.url}"?`);
   if (!confirmed) {
     return;
   }
@@ -113,7 +113,7 @@ async function deleteBookmark(bookmark: Bookmark) {
       currentBookmark.value = null;
     }
     await searchBookmarks();
-    message.value = "已删除";
+    message.value = "Deleted";
   } catch (error) {
     message.value = getErrorMessage(error);
   }
@@ -153,7 +153,7 @@ async function openBookmark(bookmark: Bookmark) {
 async function copyBookmark(bookmark: Bookmark) {
   try {
     await navigator.clipboard.writeText(bookmark.url);
-    message.value = "已复制";
+    message.value = "Copied";
   } catch (error) {
     message.value = getErrorMessage(error);
   }
@@ -177,7 +177,7 @@ onMounted(() => {
     <header class="page-header">
       <div>
         <p class="eyebrow">Latch</p>
-        <h1>书签</h1>
+        <h1>Bookmarks</h1>
       </div>
       <ConnectionStatus :status="connectionStatus" />
     </header>
@@ -188,10 +188,10 @@ onMounted(() => {
         :class="{ active: mode === 'current' }"
         @click="mode = 'current'"
       >
-        当前页
+        Current Page
       </button>
       <button type="button" :class="{ active: mode === 'search' }" @click="mode = 'search'">
-        搜索
+        Search
       </button>
     </nav>
 
@@ -200,8 +200,8 @@ onMounted(() => {
     </p>
 
     <section v-if="mode === 'current'" class="view-stack">
-      <div v-if="isBooting || isTabLoading" class="empty-state">加载中</div>
-      <div v-else-if="!canSaveCurrentTab" class="empty-state">当前页面不能保存</div>
+      <div v-if="isBooting || isTabLoading" class="empty-state">Loading</div>
+      <div v-else-if="!canSaveCurrentTab" class="empty-state">This page cannot be saved</div>
       <template v-else>
         <div class="current-url">
           <strong>{{ currentTab?.title || currentUrl }}</strong>
@@ -221,14 +221,14 @@ onMounted(() => {
           class="danger-button full-width"
           @click="deleteBookmark(currentBookmark)"
         >
-          删除书签
+          Delete Bookmark
         </button>
       </template>
     </section>
 
     <section v-else class="view-stack">
       <label class="field">
-        <span>搜索</span>
+        <span>Search</span>
         <input v-model="searchQuery" type="search" autocomplete="off" />
       </label>
       <BookmarkList

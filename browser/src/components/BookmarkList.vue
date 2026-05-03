@@ -29,8 +29,8 @@ function hostname(bookmark: Bookmark) {
 
 <template>
   <div class="bookmark-list">
-    <div v-if="isLoading" class="empty-state">加载中</div>
-    <div v-else-if="bookmarks.length === 0" class="empty-state">没有匹配书签</div>
+    <div v-if="isLoading" class="empty-state">Loading</div>
+    <div v-else-if="bookmarks.length === 0" class="empty-state">No matching bookmarks</div>
     <template v-else>
       <article v-for="bookmark in bookmarks" :key="bookmark.id" class="bookmark-item">
         <div class="bookmark-main">
@@ -41,9 +41,9 @@ function hostname(bookmark: Bookmark) {
           <span v-for="tag in bookmark.tags" :key="tag" class="tag">{{ tag }}</span>
         </div>
         <div class="item-actions">
-          <button type="button" @click="emit('open', bookmark)">打开</button>
-          <button type="button" @click="emit('copy', bookmark)">复制</button>
-          <button type="button" class="danger-button" @click="emit('delete', bookmark)">删除</button>
+          <button type="button" @click="emit('open', bookmark)">Open</button>
+          <button type="button" @click="emit('copy', bookmark)">Copy</button>
+          <button type="button" class="danger-button" @click="emit('delete', bookmark)">Delete</button>
         </div>
       </article>
     </template>

@@ -174,17 +174,17 @@ async fn main() -> Result<()> {
         Command::Logs(args) => print_logs(args.lines),
         Command::Start => {
             service::start()?;
-            println!("Latch 服务已启动");
+            println!("Latch service started");
             Ok(())
         }
         Command::Stop => {
             service::stop()?;
-            println!("Latch 服务已停止");
+            println!("Latch service stopped");
             Ok(())
         }
         Command::Restart => {
             service::restart()?;
-            println!("Latch 服务已重启");
+            println!("Latch service restarted");
             Ok(())
         }
         Command::Service { command } => handle_service_command(command),
@@ -258,14 +258,14 @@ async fn import_browser_html(path: PathBuf) -> Result<()> {
         .await
         .map_err(|error| anyhow!(error.message().to_owned()))?;
 
-    println!("浏览器书签导入完成");
-    println!("文件: {}", path.display());
-    println!("解析到书签: {parsed_total}");
-    println!("跳过非网页书签: {skipped_non_http}");
-    println!("新建: {}", result.created);
-    println!("恢复: {}", result.restored);
-    println!("跳过重复: {}", result.skipped);
-    println!("数据文件: {}", config.data_file.display());
+    println!("Browser bookmarks import complete");
+    println!("File: {}", path.display());
+    println!("Parsed bookmarks: {parsed_total}");
+    println!("Skipped non-web bookmarks: {skipped_non_http}");
+    println!("Created: {}", result.created);
+    println!("Restored: {}", result.restored);
+    println!("Skipped duplicates: {}", result.skipped);
+    println!("Data file: {}", config.data_file.display());
 
     Ok(())
 }
@@ -278,32 +278,32 @@ fn handle_service_command(command: ServiceCommand) -> Result<()> {
                 no_start: args.no_start,
                 program: args.program,
             })?;
-            println!("LaunchAgent 已安装");
+            println!("LaunchAgent installed");
             println!("plist: {}", paths::launchd_plist_file().display());
             println!(
-                "系统入口: {}",
+                "System entry: {}",
                 paths::user_launch_agent_plist_file().display()
             );
             Ok(())
         }
         ServiceCommand::Uninstall => {
             service::uninstall()?;
-            println!("LaunchAgent 已卸载");
+            println!("LaunchAgent uninstalled");
             Ok(())
         }
         ServiceCommand::Start => {
             service::start()?;
-            println!("Latch 服务已启动");
+            println!("Latch service started");
             Ok(())
         }
         ServiceCommand::Stop => {
             service::stop()?;
-            println!("Latch 服务已停止");
+            println!("Latch service stopped");
             Ok(())
         }
         ServiceCommand::Restart => {
             service::restart()?;
-            println!("Latch 服务已重启");
+            println!("Latch service restarted");
             Ok(())
         }
         ServiceCommand::Status => {
@@ -316,18 +316,10 @@ fn handle_service_command(command: ServiceCommand) -> Result<()> {
                     "not loaded"
                 }
             );
-            println!(
-                "旧 LaunchAgent(com.latch.server): {}",
-                if status.legacy_loaded {
-                    "loaded"
-                } else {
-                    "not loaded"
-                }
-            );
             println!("plist: {}", status.plist_path.display());
-            println!("系统入口: {}", status.launch_agent_path.display());
+            println!("System entry: {}", status.launch_agent_path.display());
             println!(
-                "系统入口指向 plist: {}",
+                "System entry points to plist: {}",
                 if status.launch_agent_points_to_plist {
                     "yes"
                 } else {
@@ -360,7 +352,7 @@ fn handle_config_command(command: ConfigCommand) -> Result<()> {
             let data_file = paths::local_data_file();
             sync::ensure_storage_ready(&data_file)?;
             write_config(data_file.clone(), current.port, current.log_level)?;
-            println!("已切换到本地数据文件: {}", data_file.display());
+            println!("Switched to local data file: {}", data_file.display());
             Ok(())
         }
         ConfigCommand::UseIcloud => {
@@ -368,7 +360,7 @@ fn handle_config_command(command: ConfigCommand) -> Result<()> {
             let data_file = paths::icloud_data_file();
             sync::ensure_storage_ready(&data_file)?;
             write_config(data_file.clone(), current.port, current.log_level)?;
-            println!("已切换到 iCloud 数据文件: {}", data_file.display());
+            println!("Switched to iCloud data file: {}", data_file.display());
             Ok(())
         }
     }
@@ -380,28 +372,28 @@ async fn handle_client_command(kind: ClientKind, command: ClientCommand) -> Resu
             let installed =
                 client_packages::install(kind, client_install_options(args, false)?).await?;
             println!(
-                "{} 客户端已安装: {}",
+                "{} client installed: {}",
                 installed.kind.display_name(),
                 installed.path.display()
             );
-            println!("版本: {}", installed.version);
+            println!("Version: {}", installed.version);
             Ok(())
         }
         ClientCommand::Update(args) => {
             let installed =
                 client_packages::install(kind, client_install_options(args, true)?).await?;
             println!(
-                "{} 客户端已更新: {}",
+                "{} client updated: {}",
                 installed.kind.display_name(),
                 installed.path.display()
             );
-            println!("版本: {}", installed.version);
+            println!("Version: {}", installed.version);
             Ok(())
         }
         ClientCommand::Path => {
             let path = client_packages::installed_path(kind).ok_or_else(|| {
                 anyhow!(
-                    "{} 客户端尚未安装，请先运行 `latch {} install`",
+                    "{} client is not installed. Run `latch {} install` first.",
                     kind.display_name(),
                     kind.id()
                 )
@@ -412,7 +404,7 @@ async fn handle_client_command(kind: ClientKind, command: ClientCommand) -> Resu
         ClientCommand::Open => client_packages::open(kind),
         ClientCommand::Uninstall => {
             client_packages::uninstall(kind)?;
-            println!("{} 客户端已移除", kind.display_name());
+            println!("{} client removed", kind.display_name());
             Ok(())
         }
     }
@@ -439,15 +431,15 @@ fn client_install_options(
 async fn print_status() -> Result<()> {
     let config = load_config()?;
     print_config(&config);
-    println!("Latch 主目录: {}", paths::latch_home().display());
-    println!("服务日志: {}", paths::server_log_file().display());
+    println!("Latch home: {}", paths::latch_home().display());
+    println!("Server log: {}", paths::server_log_file().display());
 
     let base_url = format!("http://127.0.0.1:{}", config.port);
     match fetch_status(&base_url).await {
         Ok(status) => {
             println!("API: ok");
             if let Some(total) = status.total {
-                println!("书签总数: {total}");
+                println!("Bookmark total: {total}");
             }
         }
         Err(error) => {
@@ -465,9 +457,6 @@ async fn print_status() -> Result<()> {
                     "not loaded"
                 }
             );
-            if status.legacy_loaded {
-                println!("旧 LaunchAgent(com.latch.server): loaded");
-            }
         }
     }
 
@@ -479,12 +468,12 @@ async fn print_doctor() -> Result<()> {
     let mut checks = Vec::new();
     checks.push(check(
         paths::path_exists(&config.config_path),
-        "配置文件存在",
+        "Config file exists",
         config.config_path.display().to_string(),
     ));
     checks.push(check(
         config.data_file.parent().is_some_and(paths::path_exists),
-        "数据目录存在",
+        "Data directory exists",
         config
             .data_file
             .parent()
@@ -493,7 +482,7 @@ async fn print_doctor() -> Result<()> {
     ));
     checks.push(check(
         paths::path_exists(&paths::latch_home()),
-        "Latch 主目录存在",
+        "Latch home exists",
         paths::latch_home().display().to_string(),
     ));
     let icloud_data_file = paths::icloud_data_file();
@@ -502,14 +491,14 @@ async fn print_doctor() -> Result<()> {
         .unwrap_or_else(|| std::path::Path::new("/"));
     checks.push(check(
         paths::path_exists(&icloud_data_file) || paths::path_exists(icloud_parent),
-        "iCloud Drive 路径可见",
+        "iCloud Drive path visible",
         icloud_data_file.display().to_string(),
     ));
 
     let base_url = format!("http://127.0.0.1:{}", config.port);
     checks.push(match fetch_status(&base_url).await {
-        Ok(_) => "[ok] API 健康检查通过".to_owned(),
-        Err(error) => format!("[warn] API 暂不可用: {error}"),
+        Ok(_) => "[ok] API health check passed".to_owned(),
+        Err(error) => format!("[warn] API unavailable: {error}"),
     });
 
     if cfg!(target_os = "macos") {
@@ -517,11 +506,11 @@ async fn print_doctor() -> Result<()> {
             Ok(status) => {
                 checks.push(check(
                     status.launch_agent_points_to_plist,
-                    "LaunchAgent 系统入口正确",
+                    "LaunchAgent system entry is correct",
                     status.launch_agent_path.display().to_string(),
                 ));
                 checks.push(format!(
-                    "[{}] LaunchAgent 加载状态: {}",
+                    "[{}] LaunchAgent loaded state: {}",
                     if status.loaded { "ok" } else { "warn" },
                     if status.loaded {
                         "loaded"
@@ -529,17 +518,8 @@ async fn print_doctor() -> Result<()> {
                         "not loaded"
                     }
                 ));
-                checks.push(format!(
-                    "[{}] 旧 LaunchAgent(com.latch.server): {}",
-                    if status.legacy_loaded { "warn" } else { "ok" },
-                    if status.legacy_loaded {
-                        "loaded"
-                    } else {
-                        "not loaded"
-                    }
-                ));
             }
-            Err(error) => checks.push(format!("[warn] 无法检查 LaunchAgent: {error}")),
+            Err(error) => checks.push(format!("[warn] Failed to check LaunchAgent: {error}")),
         }
     }
 
@@ -551,13 +531,13 @@ async fn print_doctor() -> Result<()> {
 }
 
 fn print_config(config: &config::AppConfig) {
-    println!("配置文件: {}", config.config_path.display());
-    println!("数据文件: {}", config.data_file.display());
-    println!("端口: {}", config.port);
-    println!("日志级别: {}", config.log_level);
-    println!("CLI 日志: {}", paths::cli_log_file().display());
+    println!("Config file: {}", config.config_path.display());
+    println!("Data file: {}", config.data_file.display());
+    println!("Port: {}", config.port);
+    println!("Log level: {}", config.log_level);
+    println!("CLI log: {}", paths::cli_log_file().display());
     for warning in &config.warnings {
-        println!("配置警告: {warning}");
+        println!("Config warning: {warning}");
     }
 }
 

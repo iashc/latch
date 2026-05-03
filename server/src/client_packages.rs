@@ -467,7 +467,7 @@ fn warn_if_marker_missing(kind: ClientKind, version_dir: &Path) {
     }
 
     eprintln!(
-        "警告: {} 包中没有在根目录或一级子目录找到 {}，请确认 release 包结构。",
+        "Warning: {} package does not contain {} at the root or one level down. Check the release package structure.",
         kind.display_name(),
         kind.marker_file()
     );

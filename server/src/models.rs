@@ -231,9 +231,9 @@ mod tests {
             " Rust ".to_owned(),
             "rust".to_owned(),
             "RUST".to_owned(),
-            " 编程 ".to_owned(),
+            " Docs ".to_owned(),
             "".to_owned(),
         ];
-        assert_eq!(normalize_tags(&tags), vec!["rust", "编程"]);
+        assert_eq!(normalize_tags(&tags), vec!["rust", "docs"]);
     }
 }

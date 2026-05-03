@@ -34,7 +34,7 @@ export default function BrowseTagsCommand() {
   }, []);
 
   return (
-    <List isLoading={isLoading} navigationTitle="标签">
+    <List isLoading={isLoading} navigationTitle="Tags">
       {tags.map((tag) => (
         <List.Item
           key={tag.name}
@@ -44,11 +44,11 @@ export default function BrowseTagsCommand() {
           actions={
             <ActionPanel>
               <Action.Push
-                title="查看该标签下的书签"
+                title="View Bookmarks with This Tag"
                 target={
                   <BookmarkListView
                     fixedTag={tag.name}
-                    navigationTitle={`标签：${tag.name}`}
+                    navigationTitle={`Tag: ${tag.name}`}
                   />
                 }
               />

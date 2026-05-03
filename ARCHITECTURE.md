@@ -104,7 +104,7 @@ Examples:
 
 Applied on write: trim whitespace, drop empty values, deduplicate, lowercase.
 
-- `[" Rust ", "rust", "RUST", " 编程 ", ""]` → `["rust", "编程"]`
+- `[" Rust ", "rust", "RUST", " Docs ", ""]` → `["rust", "docs"]`
 
 ### Uniqueness
 

@@ -23,7 +23,7 @@ async function testConnection(serverUrl = serverUrlInput.value) {
   try {
     await createLatchApi(serverUrl).health();
     status.value = "online";
-    message.value = "连接正常";
+    message.value = "Connection OK";
   } catch (error) {
     status.value = "offline";
     message.value = getErrorMessage(error);
@@ -60,23 +60,23 @@ onMounted(async () => {
     <header class="page-header">
       <div>
         <p class="eyebrow">Latch</p>
-        <h1>设置</h1>
+        <h1>Settings</h1>
       </div>
       <ConnectionStatus :status="status" />
     </header>
 
     <form class="settings-panel" @submit.prevent="handleSave">
       <label class="field">
-        <span>服务地址</span>
+        <span>Server URL</span>
         <input v-model="serverUrlInput" type="url" spellcheck="false" />
       </label>
 
       <div class="button-row">
         <button class="primary-button" type="submit" :disabled="!canSubmit">
-          {{ isSaving ? "保存中" : "保存" }}
+          {{ isSaving ? "Saving" : "Save" }}
         </button>
         <button type="button" :disabled="isTesting" @click="testConnection()">
-          {{ isTesting ? "检查中" : "测试连接" }}
+          {{ isTesting ? "Checking" : "Test Connection" }}
         </button>
       </div>
 

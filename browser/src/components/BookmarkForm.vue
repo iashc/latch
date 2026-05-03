@@ -58,19 +58,19 @@ function handleSubmit() {
 <template>
   <form class="bookmark-form" @submit.prevent="handleSubmit">
     <label class="field">
-      <span>标题</span>
+      <span>Title</span>
       <input v-model="title" type="text" autocomplete="off" />
     </label>
     <label class="field">
-      <span>描述</span>
+      <span>Description</span>
       <textarea v-model="description" rows="3" />
     </label>
     <label class="field">
-      <span>标签</span>
+      <span>Tags</span>
       <input v-model="tagsText" type="text" autocomplete="off" placeholder="rust, docs" />
     </label>
     <button class="primary-button" type="submit" :disabled="!canSubmit">
-      {{ isSubmitting ? "保存中" : submitLabel }}
+      {{ isSubmitting ? "Saving" : submitLabel }}
     </button>
   </form>
 </template>

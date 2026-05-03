@@ -8,6 +8,6 @@ defineProps<Props>();
 
 <template>
   <span class="connection-status" :class="`connection-status--${status}`">
-    {{ status === "online" ? "已连接" : status === "checking" ? "检查中" : "未连接" }}
+    {{ status === "online" ? "Connected" : status === "checking" ? "Checking" : "Disconnected" }}
   </span>
 </template>

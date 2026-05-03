@@ -11,8 +11,6 @@ use anyhow::{Context, Result, anyhow, bail};
 
 use crate::{models::now_utc, paths};
 
-const LEGACY_SERVICE_LABEL: &str = "com.latch.server";
-
 #[derive(Debug, Clone)]
 pub struct InstallOptions {
     pub force: bool,
@@ -23,7 +21,6 @@ pub struct InstallOptions {
 #[derive(Debug, Clone)]
 pub struct ServiceStatus {
     pub loaded: bool,
-    pub legacy_loaded: bool,
     pub plist_path: PathBuf,
     pub launch_agent_path: PathBuf,
     pub launch_agent_points_to_plist: bool,
@@ -52,7 +49,6 @@ pub fn install(options: InstallOptions) -> Result<()> {
     ))?;
 
     if !options.no_start {
-        stop_legacy_if_loaded()?;
         start()?;
     }
 
@@ -81,7 +77,6 @@ pub fn uninstall() -> Result<()> {
 
 pub fn start() -> Result<()> {
     ensure_macos()?;
-    stop_legacy_if_loaded()?;
 
     let status = status()?;
     if !status.loaded {
@@ -132,7 +127,6 @@ pub fn status() -> Result<ServiceStatus> {
     let launch_agent_path = paths::user_launch_agent_plist_file();
     Ok(ServiceStatus {
         loaded: is_loaded()?,
-        legacy_loaded: is_label_loaded(LEGACY_SERVICE_LABEL)?,
         plist_path: plist_path.clone(),
         launch_agent_path: launch_agent_path.clone(),
         launch_agent_points_to_plist: launch_agent_points_to_plist(&launch_agent_path, &plist_path),
@@ -260,18 +254,6 @@ fn wait_for_label_loaded(label: &str, timeout: Duration) -> Result<()> {
 
         thread::sleep(Duration::from_millis(100));
     }
-}
-
-fn stop_legacy_if_loaded() -> Result<()> {
-    if !is_label_loaded(LEGACY_SERVICE_LABEL)? {
-        return Ok(());
-    }
-
-    let target = format!("{}/{}", launchctl_domain(), LEGACY_SERVICE_LABEL);
-    run_launchctl(&["bootout", &target]).context("Failed to stop legacy LaunchAgent")?;
-    append_install_log("stopped legacy launch agent com.latch.server")?;
-
-    Ok(())
 }
 
 fn run_launchctl(args: &[&str]) -> Result<()> {
