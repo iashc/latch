@@ -1,0 +1,183 @@
+import {
+  Action,
+  ActionPanel,
+  Alert,
+  Color,
+  Icon,
+  List,
+  Toast,
+  confirmAlert,
+  open,
+  showToast,
+} from "@raycast/api";
+import { useEffect, useState } from "react";
+
+import type { Bookmark } from "../../../shared/types";
+import { deleteBookmark, listBookmarks, recordBookmarkOpen } from "../lib/api";
+
+interface BookmarkListViewProps {
+  fixedTag?: string;
+  navigationTitle?: string;
+}
+
+export function BookmarkListView({
+  fixedTag,
+  navigationTitle = "Latch Bookmarks",
+}: BookmarkListViewProps) {
+  const [searchText, setSearchText] = useState("");
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const query = searchText.trim();
+
+  async function revalidate() {
+    setIsLoading(true);
+    try {
+      const response = await listBookmarks({
+        q: query || undefined,
+        tag: fixedTag,
+        limit: 100,
+      });
+      setBookmarks(response.data);
+    } catch (error) {
+      setBookmarks([]);
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "加载书签失败",
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void revalidate();
+  }, [query, fixedTag]);
+
+  async function handleOpen(bookmark: Bookmark) {
+    try {
+      await recordBookmarkOpen(bookmark.id);
+    } catch (error) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "已打开链接，但记录打开次数失败",
+        message: getErrorMessage(error),
+      });
+    } finally {
+      await open(bookmark.url);
+      await revalidate();
+    }
+  }
+
+  async function handleDelete(bookmark: Bookmark) {
+    const confirmed = await confirmAlert({
+      title: "删除书签？",
+      message: `将会软删除「${bookmark.title || bookmark.url}」`,
+      primaryAction: {
+        title: "删除",
+        style: Alert.ActionStyle.Destructive,
+      },
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    const toast = await showToast({
+      style: Toast.Style.Animated,
+      title: "正在删除书签",
+    });
+
+    try {
+      await deleteBookmark(bookmark.id);
+      toast.style = Toast.Style.Success;
+      toast.title = "书签已删除";
+      await revalidate();
+    } catch (error) {
+      toast.style = Toast.Style.Failure;
+      toast.title = "删除失败";
+      toast.message = getErrorMessage(error);
+    }
+  }
+
+  return (
+    <List
+      isLoading={isLoading}
+      navigationTitle={navigationTitle}
+      searchBarPlaceholder={fixedTag ? `在标签 ${fixedTag} 中搜索` : "搜索书签"}
+      onSearchTextChange={setSearchText}
+      throttle
+    >
+      {bookmarks.map((bookmark) => (
+        <List.Item
+          key={bookmark.id}
+          icon={Icon.Bookmark}
+          title={bookmark.title || bookmark.url}
+          subtitle={bookmark.title ? bookmark.url : undefined}
+          keywords={[bookmark.url, bookmark.description, ...bookmark.tags]}
+          accessories={buildAccessories(bookmark)}
+          actions={
+            <ActionPanel>
+              <Action
+                title="打开书签"
+                icon={Icon.Globe}
+                onAction={() => handleOpen(bookmark)}
+              />
+              <Action.CopyToClipboard
+                title="复制链接"
+                content={bookmark.url}
+                shortcut={{ modifiers: ["cmd"], key: "." }}
+              />
+              <Action
+                title="刷新列表"
+                icon={Icon.ArrowClockwise}
+                onAction={revalidate}
+                shortcut={{ modifiers: ["cmd"], key: "r" }}
+              />
+              <Action
+                title="删除书签"
+                icon={Icon.Trash}
+                style={Action.Style.Destructive}
+                onAction={() => handleDelete(bookmark)}
+                shortcut={{ modifiers: ["ctrl"], key: "x" }}
+              />
+            </ActionPanel>
+          }
+        />
+      ))}
+    </List>
+  );
+}
+
+function buildAccessories(bookmark: Bookmark): List.Item.Accessory[] {
+  const accessories: List.Item.Accessory[] = [];
+
+  if (bookmark.tags.length > 0) {
+    accessories.push({
+      tag: {
+        value: bookmark.tags.join(" · "),
+        color: Color.Blue,
+      },
+    });
+  }
+
+  accessories.push({
+    text: `打开 ${bookmark.open_count}`,
+    icon: Icon.Eye,
+  });
+
+  accessories.push({
+    date: new Date(bookmark.updated_at),
+    tooltip: `最近更新：${bookmark.updated_at}`,
+  });
+
+  return accessories;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "发生未知错误";
+}

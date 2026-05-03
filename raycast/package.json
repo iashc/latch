@@ -1,0 +1,62 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "latch",
+  "title": "Latch",
+  "description": "Search and manage bookmarks from a local Latch server",
+  "icon": "latch-icon.svg",
+  "author": "lihaochen",
+  "license": "MIT",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "commands": [
+    {
+      "name": "search",
+      "title": "Search Bookmarks",
+      "subtitle": "Search, open, copy, and delete bookmarks",
+      "description": "Search bookmarks with live results from the local Latch server",
+      "mode": "view",
+      "icon": "latch-icon.svg"
+    },
+    {
+      "name": "add",
+      "title": "Add Bookmark",
+      "subtitle": "Create a new bookmark",
+      "description": "Quickly add a bookmark to Latch",
+      "mode": "view",
+      "icon": "latch-icon.svg"
+    },
+    {
+      "name": "tags",
+      "title": "Browse Tags",
+      "subtitle": "Filter bookmarks by tag",
+      "description": "Browse Latch bookmarks by tag",
+      "mode": "view",
+      "icon": "latch-icon.svg"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "serverUrl",
+      "title": "Server URL",
+      "description": "Base URL of the local Latch server",
+      "type": "textfield",
+      "required": false,
+      "default": "http://127.0.0.1:52525"
+    }
+  ],
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray dev",
+    "lint": "ray lint"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.104.13",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "typescript": "^5.8.3"
+  }
+}

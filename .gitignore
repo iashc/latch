@@ -1,0 +1,7 @@
+/server/target
+/raycast/node_modules
+/browser/node_modules
+/browser/.wxt
+/browser/.output
+/dist
+/.DS_Store

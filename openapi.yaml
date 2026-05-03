@@ -1,0 +1,653 @@
+openapi: 3.1.0
+info:
+  title: Latch API
+  version: 0.1.0
+  description: |
+    Authoritative REST API spec for Latch.
+    Server listens on 127.0.0.1 only, no authentication.
+    All timestamps use UTC with Z suffix only; time zone offsets are rejected.
+    Request bodies must use Content-Type application/json; unknown fields return 400.
+servers:
+  - url: http://127.0.0.1:52525
+    description: Local server
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+              example:
+                ok: true
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/bookmarks:
+    get:
+      summary: List, search, and filter bookmarks
+      description: |
+        All query filters are combined with AND semantics.
+        Sorting rules:
+        - When `q` is present: frecency score descending, then `updated_at` descending, then `id` ascending
+        - When `q` is absent: `updated_at` descending, then `id` ascending
+      operationId: listBookmarks
+      parameters:
+        - name: q
+          in: query
+          description: Trimmed, case-insensitive keyword search across title, url, tags, description. Results ranked by frecency. Empty or whitespace-only value is ignored.
+          schema:
+            type: string
+        - name: tag
+          in: query
+          description: Filter by tag exact match after applying write-time tag normalization.
+          schema:
+            type: string
+        - name: url
+          in: query
+          description: Filter by exact URL match after applying write-time URL normalization.
+          schema:
+            type: string
+        - name: since
+          in: query
+          description: Inclusive lower bound for updated_at (RFC 3339 date-time).
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          description: Inclusive upper bound for updated_at (RFC 3339 date-time).
+          schema:
+            type: string
+            format: date-time
+        - name: offset
+          in: query
+          description: Number of items to skip (0-based). If offset >= total, returns empty data.
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          description: Maximum number of items to return.
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Paginated bookmark list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkList"
+              example:
+                object: list
+                data:
+                  - id: 01J5KA3X...
+                    url: https://rust-lang.org
+                    title: Rust
+                    description: ""
+                    tags:
+                      - rust
+                    open_count: 12
+                    last_opened: "2026-04-20T10:00:00Z"
+                    created_at: "2026-04-10T08:30:00Z"
+                    updated_at: "2026-04-10T08:30:00Z"
+                    deleted_at: null
+                offset: 0
+                limit: 50
+                total: 1
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create bookmark
+      description: |
+        Creates a new bookmark after server-side normalization. Only `http` and `https` URLs are accepted.
+        If the normalized URL already exists on an active bookmark, returns `409 duplicate_url`.
+        If the normalized URL exists only on soft-deleted bookmarks, this endpoint creates a new bookmark with a new `id`; it does not restore deleted records.
+      operationId: createBookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookmarkRequest"
+            example:
+              url: https://rust-lang.org
+              title: Rust
+              tags:
+                - rust
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "400":
+          description: Invalid parameters or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: URL conflicts with an active bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/bookmarks/{id}:
+    get:
+      summary: Get bookmark by ID
+      description: Returns active bookmarks only. Missing or soft-deleted bookmarks return `404 bookmark_not_found`.
+      operationId: getBookmark
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Bookmark ID (ULID).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bookmark detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "404":
+          description: Bookmark not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: Partial update bookmark
+      description: |
+        Updates an active bookmark only. Missing or soft-deleted bookmarks return `404 bookmark_not_found`.
+        Request body must include at least one field. To clear fields, send `""` for string fields and `[]` for tags; `null` is not accepted.
+        If the updated URL normalizes to the bookmark's own current URL, it is not treated as a conflict.
+      operationId: updateBookmark
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Bookmark ID (ULID).
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookmarkRequest"
+            example:
+              title: Rust Official
+              tags:
+                - rust
+                - lang
+      responses:
+        "200":
+          description: Updated bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "400":
+          description: Invalid parameters or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Bookmark not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Updated URL conflicts with another active bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Soft-delete bookmark
+      description: Soft-deletes an active bookmark. Missing or already soft-deleted bookmarks return `404 bookmark_not_found`.
+      operationId: deleteBookmark
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Bookmark ID (ULID).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Soft-deleted bookmark (deleted_at set)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "404":
+          description: Bookmark not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/bookmarks/{id}/open:
+    post:
+      summary: Record bookmark open
+      description: |
+        Increments `open_count` by 1, sets `last_opened` and `updated_at` to current time.
+        Active bookmarks only. Missing or soft-deleted bookmarks return `404 bookmark_not_found`.
+      operationId: recordBookmarkOpen
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Bookmark ID (ULID).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "404":
+          description: Bookmark not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/bookmarks/tags:
+    get:
+      summary: List tags with counts
+      operationId: listBookmarkTags
+      responses:
+        "200":
+          description: Tag list sorted by name ascending, active bookmarks only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagList"
+              example:
+                object: list
+                data:
+                  - name: rust
+                    count: 12
+                total: 1
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/bookmarks/import:
+    post:
+      summary: Bulk import bookmarks
+      description: |
+        Import multiple bookmarks at once. Empty items array is valid and returns 200 with all counters at zero.
+        Validation is atomic: if any item is invalid, the whole request fails and no changes are written.
+        Duplicate handling:
+        - URL matches an active bookmark: skip
+        - URL matches a soft-deleted bookmark: restore in place (clear deleted_at, update mutable fields from import data, preserve id/created_at/open_count/last_opened)
+        - Duplicate normalized URLs in the same request are processed in array order; the first effective item wins and later duplicates are skipped
+      operationId: importBookmarks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportBookmarksRequest"
+            example:
+              items:
+                - url: https://rust-lang.org
+                  title: Rust
+                  tags:
+                    - rust
+                - url: https://example.com
+                  title: Example
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+              example:
+                object: import_result
+                created: 1
+                restored: 1
+                skipped: 1
+                total: 3
+        "400":
+          description: Invalid parameters, malformed JSON, or invalid import items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    Bookmark:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - url
+        - title
+        - description
+        - tags
+        - open_count
+        - last_opened
+        - created_at
+        - updated_at
+        - deleted_at
+      properties:
+        id:
+          type: string
+          description: ULID (time-ordered, globally unique).
+          example: 01J5KA3X...
+        url:
+          type: string
+          description: Normalized bookmark URL.
+          example: https://rust-lang.org
+        title:
+          type: string
+          description: Bookmark title (may be empty string).
+          example: Rust
+        description:
+          type: string
+          description: User note (may be empty string).
+          example: ""
+        tags:
+          type: array
+          description: Tag array.
+          items:
+            type: string
+          default: []
+        open_count:
+          type: integer
+          minimum: 0
+          description: Open count for frecency ranking (server-managed).
+          example: 12
+        last_opened:
+          description: Last opened time (server-managed).
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+          example: "2026-04-20T10:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation time, UTC ISO8601 (Z suffix only).
+          example: "2026-04-10T08:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update time, UTC ISO8601 (Z suffix only).
+          example: "2026-04-10T08:30:00Z"
+        deleted_at:
+          description: Soft-delete timestamp. Non-null means deleted.
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+          example: null
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: "Error code: invalid_request, bookmark_not_found, duplicate_url, import_invalid_item, internal_error."
+          example: bookmark_not_found
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Bookmark not found
+        details:
+          type: object
+          description: Optional structured error details for client handling.
+          additionalProperties: true
+          example:
+            item_index: 2
+            field: url
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+    BookmarkList:
+      type: object
+      additionalProperties: false
+      required:
+        - object
+        - data
+        - offset
+        - limit
+        - total
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bookmark"
+        offset:
+          type: integer
+          minimum: 0
+          example: 0
+        limit:
+          type: integer
+          minimum: 1
+          example: 50
+        total:
+          type: integer
+          minimum: 0
+          example: 1
+    TagSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - count
+      properties:
+        name:
+          type: string
+          description: Tag name.
+          example: rust
+        count:
+          type: integer
+          minimum: 0
+          description: Number of active bookmarks with this tag.
+          example: 12
+    TagList:
+      type: object
+      additionalProperties: false
+      required:
+        - object
+        - data
+        - total
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagSummary"
+        total:
+          type: integer
+          minimum: 0
+          example: 2
+    CreateBookmarkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: Bookmark URL (required, http/https only). Server normalizes before dedup and storage.
+        title:
+          type: string
+          description: Bookmark title (default empty string).
+        description:
+          type: string
+          description: User note (default empty string).
+        tags:
+          type: array
+          description: Tag array (default []).
+          items:
+            type: string
+    UpdateBookmarkRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: Updated URL (http/https only). Server normalizes before dedup and storage.
+        title:
+          type: string
+          description: Updated title. Use empty string to clear.
+        description:
+          type: string
+          description: Updated note. Use empty string to clear.
+        tags:
+          type: array
+          description: Updated tag array. Use empty array to clear. Server applies tag normalization.
+          items:
+            type: string
+    ImportBookmarksRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Array of bookmarks to import. Each item requires at least url.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - url
+            properties:
+              url:
+                type: string
+                description: Bookmark URL (http/https only). Server normalizes before dedup and storage.
+              title:
+                type: string
+              description:
+                type: string
+              tags:
+                type: array
+                description: Server applies tag normalization.
+                items:
+                  type: string
+    ImportResult:
+      type: object
+      additionalProperties: false
+      required:
+        - object
+        - created
+        - restored
+        - skipped
+        - total
+      properties:
+        object:
+          type: string
+          const: import_result
+        created:
+          type: integer
+          minimum: 0
+          description: Number of newly created bookmarks.
+          example: 1
+        restored:
+          type: integer
+          minimum: 0
+          description: Number of soft-deleted bookmarks restored in place.
+          example: 1
+        skipped:
+          type: integer
+          minimum: 0
+          description: Number of items skipped because an active bookmark already existed or an earlier item in the same request won.
+          example: 1
+        total:
+          type: integer
+          minimum: 0
+          example: 3
