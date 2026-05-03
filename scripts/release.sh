@@ -202,9 +202,10 @@ while IFS= read -r target; do
   cargo build --manifest-path "$ROOT_DIR/server/Cargo.toml" --release --locked --target "$target"
 
   package_dir="$STAGING_DIR/latch-cli-$target"
-  mkdir -p "$package_dir/bin"
-  cp "$ROOT_DIR/server/target/$target/release/latch" "$package_dir/bin/latch"
-  tar -C "$package_dir" -czf "$OUT_DIR/latch-cli-$target.tar.gz" bin/latch
+  mkdir -p "$package_dir"
+  cp "$ROOT_DIR/server/target/$target/release/latch" "$package_dir/latch"
+  chmod 0755 "$package_dir/latch"
+  tar -C "$package_dir" -czf "$OUT_DIR/latch-cli-$target.tar.gz" latch
 
   CLI_ASSET_ENTRIES+=("$target")
 done < <(split_targets)
@@ -301,7 +302,7 @@ class Latch < Formula
   depends_on :macos
 
   def install
-    bin.install "bin/latch"
+    bin.install "latch"
   end
 
   test do
