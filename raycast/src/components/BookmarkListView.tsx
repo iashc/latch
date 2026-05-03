@@ -10,7 +10,7 @@ import {
   open,
   showToast,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bookmark } from "../../../shared/types";
 import { deleteBookmark, listBookmarks, recordBookmarkOpen } from "../lib/api";
@@ -26,46 +26,101 @@ export function BookmarkListView({
 }: BookmarkListViewProps) {
   const [searchText, setSearchText] = useState("");
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [resetSelectionItemId, setResetSelectionItemId] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
+  const requestIdRef = useRef(0);
+  const resetSelectionTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const query = searchText.trim();
 
-  async function revalidate() {
+  async function revalidate(options: { resetSelection?: boolean } = {}) {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
+
     try {
       const response = await listBookmarks({
         q: query || undefined,
         tag: fixedTag,
         limit: 100,
       });
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setBookmarks(response.data);
+      if (options.resetSelection) {
+        resetSelection(response.data[0]?.id);
+      }
     } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setBookmarks([]);
+      resetSelection(undefined);
       await showToast({
         style: Toast.Style.Failure,
         title: "加载书签失败",
         message: getErrorMessage(error),
       });
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    void revalidate();
+    void revalidate({ resetSelection: true });
   }, [query, fixedTag]);
+
+  useEffect(() => {
+    return () => {
+      if (resetSelectionTimerRef.current) {
+        clearTimeout(resetSelectionTimerRef.current);
+      }
+    };
+  }, []);
+
+  function resetSelection(itemId: string | undefined) {
+    if (resetSelectionTimerRef.current) {
+      clearTimeout(resetSelectionTimerRef.current);
+    }
+
+    setResetSelectionItemId(itemId);
+
+    if (!itemId) {
+      return;
+    }
+
+    resetSelectionTimerRef.current = setTimeout(() => {
+      setResetSelectionItemId(undefined);
+    }, 50);
+  }
 
   async function handleOpen(bookmark: Bookmark) {
     try {
-      await recordBookmarkOpen(bookmark.id);
+      await open(bookmark.url);
+    } catch (error) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "打开链接失败",
+        message: getErrorMessage(error),
+      });
+      return;
+    }
+
+    void recordOpen(bookmark.id);
+  }
+
+  async function recordOpen(bookmarkId: string) {
+    try {
+      await recordBookmarkOpen(bookmarkId);
     } catch (error) {
       await showToast({
         style: Toast.Style.Failure,
         title: "已打开链接，但记录打开次数失败",
         message: getErrorMessage(error),
       });
-    } finally {
-      await open(bookmark.url);
-      await revalidate();
     }
   }
 
@@ -105,11 +160,15 @@ export function BookmarkListView({
       isLoading={isLoading}
       navigationTitle={navigationTitle}
       searchBarPlaceholder={fixedTag ? `在标签 ${fixedTag} 中搜索` : "搜索书签"}
+      searchText={searchText}
+      filtering={false}
       onSearchTextChange={setSearchText}
+      selectedItemId={resetSelectionItemId}
       throttle
     >
       {bookmarks.map((bookmark) => (
         <List.Item
+          id={bookmark.id}
           key={bookmark.id}
           icon={Icon.Bookmark}
           title={bookmark.title || bookmark.url}

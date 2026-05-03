@@ -169,6 +169,7 @@ fi
 
 require_command cargo
 require_command npm
+require_command node
 require_command rustc
 require_command shasum
 require_command zip
@@ -230,12 +231,25 @@ echo "==> Building Raycast extension"
   npm run build
 )
 raycast_stage="$STAGING_DIR/latch-raycast"
+raycast_package_name="$(node -p "require('$ROOT_DIR/raycast/package.json').name")"
+raycast_build_dir="${XDG_CONFIG_HOME:-$HOME/.config}/raycast/extensions/$raycast_package_name"
+if [[ ! -d "$raycast_build_dir" ]]; then
+  echo "Raycast build output not found: $raycast_build_dir" >&2
+  exit 1
+fi
+while IFS= read -r command_name; do
+  [[ -z "$command_name" ]] && continue
+  if [[ ! -f "$raycast_build_dir/$command_name.js" ]]; then
+    echo "Raycast command executable missing: $raycast_build_dir/$command_name.js" >&2
+    exit 1
+  fi
+done < <(node -e "const pkg = require('$ROOT_DIR/raycast/package.json'); for (const command of pkg.commands || []) console.log(command.name)")
 mkdir -p "$raycast_stage"
 rsync -a \
   --exclude node_modules \
   --exclude .git \
   --exclude .DS_Store \
-  "$ROOT_DIR/raycast/" "$raycast_stage/"
+  "$raycast_build_dir/" "$raycast_stage/"
 zip_dir_contents "$raycast_stage" "$OUT_DIR/latch-raycast.zip"
 
 echo "==> Writing release manifest"

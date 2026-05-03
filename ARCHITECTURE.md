@@ -278,11 +278,8 @@ POST   /api/bookmarks/import    # Bulk import
 ### Access & CORS
 
 - Listens on `127.0.0.1` only, no auth token
-- CORS disabled by default (no web page access)
-- Allowlist for browser extensions only: `chrome-extension://<id>`, `moz-extension://<id>`
-- Extension IDs hardcoded at compile time
-- Allowed methods: `GET, POST, PATCH, DELETE, OPTIONS`
-- Allowed headers: `Content-Type`
+- CORS is not enabled for ordinary web pages
+- Browser extensions rely on extension host permissions for localhost access
 
 ## 9. Logging
 
@@ -306,7 +303,7 @@ POST   /api/bookmarks/import    # Bulk import
 ## 11. Server Lifecycle
 
 ```
-Install:    brew tap iashc/latch && brew install latch
+Install:    brew install iashc/tap/latch
 Run:        latch serve
 Autostart:  latch service install
 Plist:      ~/.latch/launchd/com.iashc.latch.plist
@@ -314,26 +311,28 @@ System link: ~/Library/LaunchAgents/com.iashc.latch.plist
 Config:     ~/.config/latch/config.toml
 Runtime:    ~/.latch
 Port:       52525 (configurable)
-Dup check:  Port occupancy check; clients can probe /health
+Dup check:  Binding fails if the configured port is already occupied; clients can probe /health
 ```
 
 ### Graceful Shutdown
 
 - On SIGTERM / SIGINT: stop accepting new requests
-- Wait for in-flight requests to complete (5s timeout, then force exit)
-- Wait for any ongoing write operation to finish and flush to disk
+- Let in-flight Axum requests complete through graceful shutdown
+- Any write already holding the store lock completes before the handler returns
 - LaunchAgent keeps stdout/stderr in `~/.latch/logs/server.log`
 
 ### CLI Commands
 
 - `latch status`, `latch doctor`, `latch logs`
+- `latch start`, `latch stop`, `latch restart`
 - `latch service install|uninstall|start|stop|restart|status|print-plist`
 - `latch config show|use-local|use-icloud`
 - `latch chrome install|update|path|open|uninstall`
+- `latch browser ...` as an alias for `latch chrome ...`
 - `latch raycast install|update|path|open|uninstall`
 - `latch import browser-html <bookmarks.html>`
 
-Chrome and Raycast client commands download prebuilt GitHub Release assets, verify sha256 from `latch-release-manifest.json`, cache archives in `~/.latch/cache`, and install unpacked clients under `~/.latch/clients`.
+Chrome and Raycast client commands download prebuilt GitHub Release assets, verify sha256 from `latch-release-manifest.json`, cache archives in `~/.latch/cache`, and install unpacked clients under `~/.latch/clients`. The Raycast asset must be the `ray build` output and include command executables such as `search.js`, `add.js`, and `tags.js` at the package root.
 
 ### Release Process
 
@@ -353,7 +352,7 @@ The script writes assets to `dist/release/<tag>`:
 - `latch-release-manifest.json`
 - `homebrew/latch.rb`
 
-The default CLI target is Apple silicon (`aarch64-apple-darwin`). The generated Homebrew formula is ARM-only and follows the same personal-use scope as `got`. Publishing is explicit. `--publish` uses the local `gh` CLI, and Homebrew tap updates require an explicit tap checkout path via `--tap-path` or `LATCH_HOMEBREW_TAP_PATH`; the script does not assume any parent-directory layout.
+The default CLI target is Apple silicon (`aarch64-apple-darwin`). The generated Homebrew formula is ARM-only and follows the same personal-use scope as this project. Publishing is explicit. `--publish` uses the local `gh` CLI, and Homebrew tap updates require an explicit tap checkout path via `--tap-path` or `LATCH_HOMEBREW_TAP_PATH`; the script does not assume any parent-directory layout.
 
 ## 12. Client Features
 
@@ -389,10 +388,13 @@ latch/
 ├── browser/                    # Browser extension (WXT + Vue 3)
 │   ├── package.json
 │   ├── wxt.config.ts
+│   ├── entrypoints/
+│   │   ├── popup/
+│   │   └── options/
 │   └── src/
-│       ├── popup/
-│       ├── background/
-│       └── lib/api.ts
+│       ├── components/
+│       ├── composables/
+│       └── lib/
 ├── raycast/                    # Raycast extension
 │   ├── package.json
 │   └── src/
