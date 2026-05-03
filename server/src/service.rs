@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 
-use crate::paths;
+use crate::{models::now_utc, paths};
 
 const LEGACY_SERVICE_LABEL: &str = "com.latch.server";
 
@@ -314,7 +314,7 @@ fn current_uid() -> u32 {
 
 fn append_install_log(message: impl AsRef<str>) -> Result<()> {
     paths::ensure_runtime_dirs()?;
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = now_utc().to_rfc3339();
     fs::OpenOptions::new()
         .create(true)
         .append(true)

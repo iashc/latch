@@ -5,10 +5,12 @@ use crate::models::ImportBookmarkItem;
 
 pub fn parse_browser_bookmarks_html(html: &str) -> Result<Vec<ImportBookmarkItem>> {
     let token_re = Regex::new(
-        r#"(?is)<h3\b(?P<h3_attrs>[^>]*)>(?P<h3_text>.*?)</h3>|<a\b(?P<a_attrs>[^>]*)>(?P<a_text>.*?)</a>|<dl\b[^>]*>|</dl>"#,
+        r#"(?s)<[hH]3(?P<h3_attrs>(?:[ \t\r\n\f][^>]*)?)>(?P<h3_text>.*?)</[hH]3>|<[aA](?P<a_attrs>(?:[ \t\r\n\f][^>]*)?)>(?P<a_text>.*?)</[aA]>|<[dD][lL](?:[ \t\r\n\f][^>]*)?>|</[dD][lL]>"#,
     )?;
-    let href_re = Regex::new(r#"(?is)\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')"#)?;
-    let tag_re = Regex::new(r"(?is)<[^>]+>")?;
+    let href_re = Regex::new(
+        r#"(?s)(?:^|[ \t\r\n\f])[hH][rR][eE][fF][ \t\r\n\f]*=[ \t\r\n\f]*(?:"([^"]*)"|'([^']*)')"#,
+    )?;
+    let tag_re = Regex::new(r"(?s)<[^>]+>")?;
 
     let mut items = Vec::new();
     let mut folders = Vec::new();

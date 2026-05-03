@@ -5,19 +5,26 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
-axum = { version = "0.8", features = ["macros"] }
-chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4", features = ["derive"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
+clap = { version = "4", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
 notify = "8"
-regex = "1"
+regex = { version = "1", default-features = false, features = ["perf", "std"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", default-features = false, features = ["macros", "net", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0.9"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
 ulid = "1"
 url = "2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

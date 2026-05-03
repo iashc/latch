@@ -149,7 +149,7 @@ fn score_bookmark(bookmark: &Bookmark, terms: &[String], now: DateTime<Utc>) -> 
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Duration, Utc};
+    use chrono::Duration;
 
     use crate::models::{Bookmark, now_utc};
 
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn search_requires_all_terms() {
-        let now = Utc::now();
+        let now = now_utc();
         let bookmarks = vec![
             make_bookmark("1", "Rust Book", "https://rust-lang.org", &["rust"]),
             make_bookmark("2", "Axum Guide", "https://docs.rs/axum", &["rust", "web"]),

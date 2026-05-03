@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zip::ZipArchive;
 
+use crate::models::now_utc;
 use crate::paths;
 
 const MANIFEST_ASSET_NAME: &str = "latch-release-manifest.json";
@@ -427,7 +428,7 @@ fn update_clients_state(
         Some(ClientStateEntry {
             version: version.to_owned(),
             path: path.to_path_buf(),
-            installed_at: Utc::now(),
+            installed_at: now_utc(),
             source_repo: source_repo.to_owned(),
             asset: asset.to_owned(),
         }),

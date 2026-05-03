@@ -125,7 +125,7 @@ pub struct NormalizedImportItem {
 }
 
 pub fn now_utc() -> DateTime<Utc> {
-    Utc::now()
+    DateTime::<Utc>::from(std::time::SystemTime::now())
 }
 
 pub fn normalize_url(input: &str) -> Result<String, ApiError> {
