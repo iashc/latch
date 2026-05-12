@@ -1,6 +1,6 @@
 # Latch
 
-Latch is a local-first personal bookmark service. The core data source is a single `jsonl` file, served by a local Rust HTTP service and accessed by the browser extension and Raycast extension through `127.0.0.1`.
+Latch is a local-first personal bookmark service. The core data source is a single `jsonl` file, served by a local Rust service and accessed by personal clients such as the browser extension and Raycast extension.
 
 This project is currently optimized for personal use and local distribution: the CLI is installed through a Homebrew tap, while the Chrome and Raycast clients are downloaded as prebuilt GitHub Release assets instead of being submitted to extension marketplaces.
 
@@ -35,6 +35,15 @@ The service listens on:
 ```text
 http://127.0.0.1:52525
 ```
+
+The productized client communication target is local IPC instead of hard-coded localhost ports:
+
+```text
+Browser Extension -> Native Messaging Host -> Unix Domain Socket -> Latch Service
+Raycast / CLI     -> Unix Domain Socket -> Latch Service
+```
+
+The HTTP API remains useful as a development and compatibility surface. See [ARCHITECTURE.md](ARCHITECTURE.md) for the planned JSON-RPC, Native Messaging, and cross-platform transport design.
 
 Common service commands:
 
@@ -100,6 +109,8 @@ latch chrome path
 ```
 
 Open `chrome://extensions`, enable Developer Mode, then load the directory printed by `latch chrome path`.
+
+For the planned Native Messaging transport, browser clients also need a one-time native host setup. The setup command should install a browser native host manifest for the host name `com.iashc.latch`; the extension calls that name, and the browser resolves the native host executable path from its registered manifest.
 
 Download and install the Raycast extension package:
 

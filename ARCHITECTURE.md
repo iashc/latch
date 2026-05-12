@@ -2,6 +2,8 @@
 
 Single `.jsonl` file as the sole data source. No database, no external runtime.
 
+The current implementation exposes a local REST API on `127.0.0.1`. The productized client communication target is local IPC with JSON-RPC, so clients do not need to know or configure localhost ports.
+
 ## 1. System Overview
 
 ```
@@ -10,6 +12,8 @@ Single `.jsonl` file as the sole data source. No database, no external runtime.
 │  Browser Extension        Raycast Extension   │
 │  (WXT, Manifest V3)      (TypeScript)         │
 │       REST ──────────┬──────── REST           │
+│       target: Native │ target: local IPC      │
+│       Messaging      │                        │
 └──────────────────────┼────────────────────────┘
                        │
          ┌─────────────▼──────────────┐
@@ -127,7 +131,10 @@ Applied on write: trim whitespace, drop empty values, deduplicate, lowercase.
 | Serialization | serde + serde_json |
 | Browser Extension | TypeScript + WXT (Chrome MV3 / Firefox / Edge) |
 | Raycast Extension | TypeScript + @raycast/api |
-| API | REST + JSON |
+| Current API | REST + JSON |
+| Target local protocol | JSON-RPC |
+| Target macOS IPC | Unix Domain Socket |
+| Target browser bridge | Native Messaging |
 
 ## 5. Search
 
@@ -197,7 +204,198 @@ Enable by setting `data_file` in `config.toml` to an iCloud Drive path.
 - On trigger: acquire write lock → full reload with conflict merge
 - If a write operation holds the lock, reload waits for it to complete
 
-## 8. API
+## 8. Client Communication Architecture (Target)
+
+The long-term client communication model separates the business protocol from the platform transport:
+
+```text
+Business protocol: JSON-RPC
+
+macOS / Linux transport: Unix Domain Socket
+Windows transport:       Named Pipe
+Browser extension bridge: Native Messaging -> local IPC
+Debug / compatibility:   localhost HTTP
+```
+
+The goal is to remove hard-coded browser and Raycast dependencies on `http://127.0.0.1:<port>`. HTTP remains useful for development, diagnostics, and ordinary web UI entry points, but first-party local clients should use the local IPC path.
+
+### macOS Runtime Path
+
+```text
+Latch Service
+  managed by LaunchAgent
+  listens on ~/.latch/run/latch.sock
+
+Raycast / CLI / desktop clients
+  connect directly to ~/.latch/run/latch.sock
+  send JSON-RPC requests
+
+Browser Extension
+  calls chrome.runtime.sendNativeMessage("com.iashc.latch", request)
+  browser launches the registered native host
+  native host forwards the JSON-RPC request to ~/.latch/run/latch.sock
+```
+
+The socket directory should be private to the current user, for example `~/.latch/run` with `0700` permissions. The service should clean up stale socket files on startup after checking that no live service owns them.
+
+### Windows Runtime Path
+
+Windows should use the same JSON-RPC protocol over a Windows-native transport:
+
+```text
+Latch Service
+  listens on \\.\pipe\latch
+
+CLI / desktop clients
+  connect directly to \\.\pipe\latch
+
+Browser Extension
+  calls Native Messaging host name com.iashc.latch
+  native host forwards to \\.\pipe\latch
+```
+
+Modern Windows has partial `AF_UNIX` support, but Named Pipe is the preferred product transport because it is the native Windows IPC mechanism and has better ecosystem and permissions support.
+
+### Native Messaging Host Discovery
+
+Browser extensions do not specify executable paths. They only name the host:
+
+```ts
+chrome.runtime.sendNativeMessage("com.iashc.latch", request)
+```
+
+The browser resolves `com.iashc.latch` through a Native Messaging host manifest installed during setup. The manifest contains the executable `path` and `allowed_origins`.
+
+macOS Chrome user-level manifest location:
+
+```text
+~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.iashc.latch.json
+```
+
+Windows Chrome uses the registry to locate the manifest:
+
+```text
+HKCU\Software\Google\Chrome\NativeMessagingHosts\com.iashc.latch
+```
+
+The registry value points to the manifest file. The manifest then points to the native host executable.
+
+Host manifest example:
+
+```json
+{
+  "name": "com.iashc.latch",
+  "description": "Latch Native Messaging Host",
+  "path": "/Users/me/.latch/bin/latch-native-host",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://<extension-id>/"]
+}
+```
+
+`path` must point to the host executable itself. On macOS and Linux it must be absolute. On Windows it can be absolute or relative to the manifest directory. It cannot include command-line arguments. If the CLI entry point is `latch native-host`, setup should install a wrapper binary or script such as `~/.latch/bin/latch-native-host`.
+
+The host must keep stdout reserved for the Native Messaging protocol. Logs go to stderr or a file.
+
+### JSON-RPC Contract
+
+All local clients should share the same RPC method names:
+
+```text
+health
+bookmarks.list
+bookmarks.get
+bookmarks.create
+bookmarks.update
+bookmarks.delete
+bookmarks.recordOpen
+bookmarks.import
+tags.list
+```
+
+Request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "req_1",
+  "method": "bookmarks.list",
+  "params": {
+    "q": "rust",
+    "limit": 50
+  }
+}
+```
+
+Success response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "req_1",
+  "result": {
+    "object": "list",
+    "data": [],
+    "offset": 0,
+    "limit": 50,
+    "total": 0
+  }
+}
+```
+
+Error response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "req_1",
+  "error": {
+    "code": "bookmark_not_found",
+    "message": "Bookmark not found"
+  }
+}
+```
+
+The IPC transport is stream-based, so JSON-RPC messages need explicit framing. Use one stable framing format across UDS and Named Pipe, such as length-prefixed JSON or newline-delimited JSON. Native Messaging already uses length-prefixed JSON between the browser and the host; the host may translate that to the internal framing used by the service.
+
+### Setup Model
+
+Product setup should become a one-time command rather than a per-client port configuration step:
+
+```bash
+latch setup
+```
+
+The setup command should:
+
+- create `~/.latch` runtime directories, including `run` and `bin`
+- install or update the LaunchAgent
+- start the Latch service
+- install `latch-native-host`
+- write Native Messaging manifests for supported browsers
+- configure `allowed_origins` for the installed browser extension IDs
+- run a health check through the local IPC path
+
+Specialized commands may still exist, for example:
+
+```bash
+latch service install
+latch browser native-host install
+```
+
+Daily use should not require users to know, choose, or persist a localhost port.
+
+### HTTP Compatibility Surface
+
+The existing REST API can remain available for:
+
+- local development
+- diagnostics with `curl`
+- compatibility during migration
+- ordinary browser-based local web UIs, which cannot directly access UDS, Named Pipe, or Native Messaging
+
+If a regular web page needs to call Latch directly, it should use a separate HTTP/WebSocket entry point with explicit token and CORS rules. It should not rely on unprotected hard-coded localhost ports.
+
+## 9. API
 
 Base URL: `http://127.0.0.1:52525`
 
@@ -281,7 +479,7 @@ POST   /api/bookmarks/import    # Bulk import
 - CORS is not enabled for ordinary web pages
 - Browser extensions rely on extension host permissions for localhost access
 
-## 9. Logging
+## 10. Logging
 
 - `tracing` + `tracing-subscriber`, structured output to stderr
 - Level configured via `log_level` in `config.toml` (default `info`)
@@ -291,7 +489,7 @@ POST   /api/bookmarks/import    # Bulk import
 - File watch reload: info log
 - Conflict merge: info log (conflict copy count, merged total)
 
-## 10. Data Migration
+## 11. Data Migration
 
 - No version field in `latch.jsonl`
 - New fields: `#[serde(default)]` fills defaults for missing fields
@@ -300,7 +498,7 @@ POST   /api/bookmarks/import    # Bulk import
 - Migration is automatic: first load + atomic rewrite persists the updated schema
 - Breaking changes: provide a standalone one-time migration tool
 
-## 11. Server Lifecycle
+## 12. Server Lifecycle
 
 ```
 Install:    brew install iashc/tap/latch
@@ -312,6 +510,14 @@ Config:     ~/.config/latch/config.toml
 Runtime:    ~/.latch
 Port:       52525 (configurable)
 Dup check:  Binding fails if the configured port is already occupied; clients can probe /health
+```
+
+Target IPC runtime:
+
+```text
+Socket:      ~/.latch/run/latch.sock
+Native host: ~/.latch/bin/latch-native-host
+Setup:       latch setup
 ```
 
 ### Graceful Shutdown
@@ -354,7 +560,7 @@ The script writes assets to `dist/release/<tag>`:
 
 The default CLI target is Apple silicon (`aarch64-apple-darwin`). The generated Homebrew formula is ARM-only and follows the same personal-use scope as this project. Publishing is explicit. `--publish` uses the local `gh` CLI, and Homebrew tap updates require an explicit tap checkout path via `--tap-path` or `LATCH_HOMEBREW_TAP_PATH`; the script does not assume any parent-directory layout.
 
-## 12. Client Features
+## 13. Client Features
 
 ### Browser Extension
 
@@ -370,7 +576,7 @@ The default CLI target is Apple silicon (`aarch64-apple-darwin`). The generated 
 - Browse by tag
 - Open bookmark / copy URL
 
-## 13. Project Structure
+## 14. Project Structure
 
 ```
 latch/
@@ -407,11 +613,12 @@ latch/
     └── types.ts
 ```
 
-## 14. Implementation Phases
+## 15. Implementation Phases
 
 ```
 Phase 1 → Server core: store + CRUD API + search
 Phase 2 → Browser extension
 Phase 3 → Raycast extension
 Phase 4 → iCloud sync
+Phase 5 → Local IPC JSON-RPC + Native Messaging setup
 ```
